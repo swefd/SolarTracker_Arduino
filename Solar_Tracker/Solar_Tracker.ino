@@ -70,7 +70,7 @@ bool ServoDirection = false;
 
 //Timer for update data
 GTimer myTimer(MS);         
-GTimer lcdTimeUpdate(MS); //not used
+GTimer Timer1sec(MS); //not used
 
 
 // Menu Settings
@@ -111,10 +111,13 @@ void setup() {
 
 	servoH.attach(8);  // attaches the servo on pin 9 to the servo object
 	servoV.attach(9);
+
 	Serial.println("1");
+
 	enc1.setType(TYPE1);
-	myTimer.setInterval(5000);
-	lcdTimeUpdate.setInterval(1000);
+
+	myTimer.setInterval(10000);         //Timers set
+
 	Serial.println("2");
 
 	//lcd.home();
@@ -135,6 +138,16 @@ void setup() {
 	lcd.print("Hello");
 	lcd.setCursor(0, 1);
 	lcd.print("MADAFAKA :)");
+
+
+
+
+	//Start
+	delay(2000);
+	printTime(RTC.get());
+	printTimeLCD(RTC.get());
+	printSolarPosition(Kiev.getSolarPosition(), digits);
+	autoMoveSolarTracker(Kiev.getSolarPosition());
 	
 
 
@@ -164,6 +177,7 @@ void loop() {
 
 		menuIsVisible = false;
 		lcd.noBacklight();
+		Timer1sec.stop();
 
 		//Serial.print("BYTE = ");
 
@@ -182,9 +196,12 @@ void loop() {
 		//Serial.println((int8_t)test);
 	}
 
-	if (lcdTimeUpdate.isReady() && modeAuto) {
+	if (Timer1sec.isReady() && menuLvl == 2 && menuScreen == 1) {
+
+		menuLcdTimeSettings(RTC.get());
 
 	}
+
 
 }
 
@@ -287,17 +304,20 @@ void encoderClickEvents() {
 	if (menuIsVisible) {
 
 		if (enc1.isTurn()) {
+			myTimer.reset();
 
-		
 			if (menuLvl == 1) {
 				if (enc1.isRight()) arrowPos++;
-				if (enc1.isLeft()) arrowPos--;
-				myTimer.reset();	
+				if (enc1.isLeft()) arrowPos--;	
 				menuLcd();	
 			}
 			else if (menuLvl == 2)
 			{
 				if (menuScreen == 1 ) {
+					if (enc1.isRight()) arrowPos++;
+					if (enc1.isLeft()) arrowPos--;
+					menuLcdTimeSettings(RTC.get());
+					//lcdArrow();
 
 				}else if (menuScreen == 2 ) {
 
@@ -315,22 +335,26 @@ void encoderClickEvents() {
 			myTimer.reset();
 
 
-			if (arrowPos == 0) {
-				menuLvl--;
-			}
-			if (menuLvl == 0) {
-				menuIsVisible = !menuIsVisible;
-				printTimeLCD(RTC.get());
-				printSolarPosition(Kiev.getSolarPosition(), digits);
-				delay(500);
-			}
-			else if (menuLvl == 1) {
+
+			if (menuLvl == 1) {
+
+				if (arrowPos == 0) {
+					menuLvl--;
+					menuIsVisible = !menuIsVisible;
+					printTimeLCD(RTC.get());
+					printSolarPosition(Kiev.getSolarPosition(), digits);
+					delay(500);
+
+				}
+
 
 				if (arrowPos == 1) {
+					menuScreen = 1;
 					menuLvl++;
-					menuScreen == arrowPos;
 					arrowPos = 1;
 					menuLcdTimeSettings(RTC.get());
+					Timer1sec.setInterval(1000);
+					
 					//menuEdit = true;                  //Enable edit mode
 				}
 				else if (arrowPos == 2) {
@@ -352,6 +376,27 @@ void encoderClickEvents() {
 			{
 				if (menuScreen == 1)
 				{
+					if (arrowPos == 0) {
+						menuLvl--;
+						menuScreen = 0;
+						menuLcd();
+						Timer1sec.stop();
+					}
+					else if (arrowPos == 1) {
+
+					}
+					else if (arrowPos == 2) {
+						
+					}
+					else if (arrowPos == 3) {
+					
+					}
+					else if (arrowPos == 4) {
+						//menuLvl++;
+						modeAuto = !modeAuto;
+						menuLcd();
+						autoMoveSolarTracker(Kiev.getSolarPosition());
+					}
 
 
 				}
@@ -429,6 +474,26 @@ void printSolarPosition(SolarPosition_t pos, int numDigits)
 	//Serial.println(map(pos.azimuth, 90, 270, 180, 0));
 }
 
+void printTime(time_t t)
+{
+	tmElements_t someTime;
+	breakTime(t, someTime);
+
+	Serial.print(someTime.Hour);
+	Serial.print(F(":"));
+	Serial.print(someTime.Minute);
+	Serial.print(F(":"));
+	Serial.print(someTime.Second);
+	Serial.print(F(" UTC on "));
+	Serial.print(dayStr(someTime.Wday));
+	Serial.print(F(", "));
+	Serial.print(monthStr(someTime.Month));
+	Serial.print(F(" "));
+	Serial.print(someTime.Day);
+	Serial.print(F(", "));
+	Serial.println(tmYearToCalendar(someTime.Year));
+}
+
 void printTimeLCD(time_t t)
 {
 	tmElements_t someTime;
@@ -436,14 +501,14 @@ void printTimeLCD(time_t t)
 
 	lcd.clear();
 	lcd.setCursor(0, 0);
-	
+
 	if (someTime.Day < 10) {
 		lcd.print("0");
 	}
 	lcd.print(someTime.Day);
 	lcd.print("/");
 
-	if (someTime.Month<10)
+	if (someTime.Month < 10)
 	{
 		lcd.print("0");
 	}
@@ -463,7 +528,7 @@ void printTimeLCD(time_t t)
 	}
 	lcd.print(someTime.Minute);
 
-	
+
 	//  lcd.print(":");
 	//  lcd.print(someTime.Second);
 	lcd.print(" UTC");
@@ -492,26 +557,6 @@ void printTimeLCD(time_t t)
 
 }
 
-void printTime(time_t t)
-{
-	tmElements_t someTime;
-	breakTime(t, someTime);
-
-	Serial.print(someTime.Hour);
-	Serial.print(F(":"));
-	Serial.print(someTime.Minute);
-	Serial.print(F(":"));
-	Serial.print(someTime.Second);
-	Serial.print(F(" UTC on "));
-	Serial.print(dayStr(someTime.Wday));
-	Serial.print(F(", "));
-	Serial.print(monthStr(someTime.Month));
-	Serial.print(F(" "));
-	Serial.print(someTime.Day);
-	Serial.print(F(", "));
-	Serial.println(tmYearToCalendar(someTime.Year));
-}
-
 void menuLcd() {
 	arrowPos = constrain(arrowPos, 0, 4);
 
@@ -529,23 +574,56 @@ void menuLcd() {
 }
 
 void lcdArrow() {
-	switch (arrowPos) {                    //arrow print 
-	case 0: lcd.setCursor(3, 0);
-		lcd.write(127);
-		break;
-	case 1: lcd.setCursor(0, 1);
-		lcd.write(126);
-		break;
-	case 2: lcd.setCursor(0, 2);
-		lcd.write(126);
-		break;
-	case 3: lcd.setCursor(8, 1);
-		lcd.write(126);
-		break;
-	case 4: lcd.setCursor(8, 2);
-		lcd.write(126);
-		break;
+
+	Serial.println("LcdArrow();");
+	Serial.println(menuLvl);
+	Serial.println(menuScreen);
+
+	if (menuLvl == 1) {
+		switch (arrowPos) {                    //arrow print 
+		case 0: lcd.setCursor(3, 0);
+			lcd.write(127);
+			break;
+		case 1: lcd.setCursor(0, 1);
+			lcd.write(126);
+			break;
+		case 2: lcd.setCursor(0, 2);
+			lcd.write(126);
+			break;
+		case 3: lcd.setCursor(8, 1);
+			lcd.write(126);
+			break;
+		case 4: lcd.setCursor(8, 2);
+			lcd.write(126);
+			break;
+		}
 	}
+
+	else if (menuLvl == 2 && menuScreen == 1) {
+		switch (arrowPos) {                    //arrow print 
+		case 0: lcd.setCursor(3, 0);
+			lcd.write(127);
+			break;
+		case 1: lcd.setCursor(3, 1);
+			lcd.write(60);
+			lcd.write(62);
+			break;
+		case 2: lcd.setCursor(6, 1);
+			lcd.write(60);
+			lcd.write(62);
+			break;
+		case 3: lcd.setCursor(9, 1);
+			lcd.write(60);
+			lcd.write(62);
+			break;
+		}
+
+	}
+
+
+
+
+
 }
 
 void menuLcdTimeSettings(time_t t) {
@@ -553,11 +631,14 @@ void menuLcdTimeSettings(time_t t) {
 	breakTime(t, someTime);
 	lcd.clear();
 
-	//lcdArrow();
+	lcdArrow();
 
 
-	lcd.setCursor(2, 0);
-	lcd.print("| Time Settings |");
+	lcd.setCursor(0, 0);
+	lcd.print("...");
+
+	lcd.setCursor(4, 0);
+	lcd.print("TIME SETTINGS");
 	lcd.setCursor(3, 2);
 
 	if (someTime.Hour < 10)
