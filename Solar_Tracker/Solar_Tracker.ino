@@ -44,7 +44,7 @@ const uint8_t digits = 3;
 bool menuIsVisible = false;
 byte menuLvl = 0;
 byte menuScreen = 0;
-byte arrowPos = 0;
+byte arrowPos = 1;
 String menuList[] = { "Time","Date","Pos","Mode" };
 
 
@@ -233,7 +233,7 @@ void encoderClickEvents() {
 		{
 			arrowPos = 0;
 			menuLvl = 1;
-			menuLcd(menuLvl, menuScreen);
+			menuLcd();
 			delay(500);
 		}
 		else
@@ -258,7 +258,13 @@ void encoderClickEvents() {
 			if (enc1.isRight()) arrowPos++;
 			if (enc1.isLeft()) arrowPos--;
 
-			menuLcd(menuLvl, menuScreen);
+			if (menuLvl == 1) {
+				myTimer.reset();
+				
+				menuLcd();
+				
+			}
+
 		}
 
 		if (enc1.isClick()) {
@@ -271,10 +277,14 @@ void encoderClickEvents() {
 				if(arrowPos!=4)
 				menuLvl++;
 			}
+
+
+
+
 			
 			menuScreen = arrowPos;
 			arrowPos = 1;
-			menuLcd(menuLvl, menuScreen);
+			menuLcd();
 
 		}
 
@@ -385,60 +395,21 @@ void printTime(time_t t)
 	Serial.println(tmYearToCalendar(someTime.Year));
 }
 
-void menuLcd(byte lvl, byte screen) {
+void menuLcd() {
+	arrowPos = constrain(arrowPos, 0, 4);
 
-	myTimer.reset();
 	lcd.clear();
+	lcdArrow();
+	lcd.setCursor(1, 0); lcd.print(menuList[0]);
+	lcd.setCursor(1, 1); lcd.print(menuList[1]);
+	lcd.setCursor(9, 0); lcd.print(menuList[2]);
+	lcd.setCursor(9, 1); lcd.print(menuList[3]);
+	lcd.print("-");
 
-	if (lvl == 1) {
-		arrowPos = constrain(arrowPos, 0, 4);
-		lcd.setCursor(1, 0); lcd.print(menuList[0]);
-		lcd.setCursor(1, 1); lcd.print(menuList[1]);
-		lcd.setCursor(9, 0); lcd.print(menuList[2]);
-		lcd.setCursor(9, 1); lcd.print(menuList[3]);
-		lcd.print("-");
+	modeAuto ? lcd.print("A") : lcd.print("M");
+}
 
-		modeAuto ? lcd.print("A") : lcd.print("M");
-	}
-
-	else if (lvl == 2) {
-
-		switch (screen)
-		{
-		case 0:  //Time
-			break;
-		case 1:  //Date
-			break;
-		case 2:  //Pos
-			break;
-		case 3:  //Mode
-			arrowPos = constrain(arrowPos, 0, 2);
-			float editPosLong = posLong;
-			float editPosLat = posLat;
-			lcd.setCursor(1, 0);
-			lcd.print("long ");
-			lcd.print(posLong, 6);
-			lcd.setCursor(1, 1);
-			lcd.print("lat ");
-			lcd.print(posLat, 6);
-			break;
-		case 4:
-			modeAuto = !modeAuto;
-			menuLcd(menuLvl, menuScreen);
-			break;
-		default:
-			break;
-		}
-
-	}
-	else {
-		menuIsVisible = !menuIsVisible;
-		printTimeLCD(RTC.get());
-		printSolarPosition(Kiev.getSolarPosition(), digits);
-		myTimer.reset();
-		delay(500);
-	}
-
+void lcdArrow() {
 	switch (arrowPos) {                    //arrow print 
 	case 0: lcd.setCursor(0, 0);
 		lcd.write(127);
@@ -457,6 +428,18 @@ void menuLcd(byte lvl, byte screen) {
 		break;
 
 	}
+}
+
+
+void menuLcdTimeSettings(time_t t) {
+	tmElements_t someTime;
+	
+	lcd.clear();
+	lcd.print("Time: ");
+	lcd.setCursor(0, 0);
+	lcd.print(someTime.Hour);
+	lcd.print(":");
+	lcd.print(someTime.Minute);
 }
 
 
