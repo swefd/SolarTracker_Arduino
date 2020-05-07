@@ -34,6 +34,7 @@ GTimer myTimer(MS);         //Timer for update data
 GTimer lcdTimeUpdate(MS);
 
 
+
 bool modeAuto = false;
 byte valH = 90, valV = 90;
 bool ServoDirection = false;
