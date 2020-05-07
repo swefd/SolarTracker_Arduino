@@ -17,50 +17,16 @@
 #include <EEPROM.h>
 #include "LcdMenu.h"
 
-#define SW 4     //Encoder pins
+//Encoder settings
+#define SW 4     
 #define DT 3
 #define CLK 2
+Encoder enc1(CLK, DT, SW);  //Encoder object
 
+//LCD
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 
-//Servo Settings
-Servo servoH;  // create servo object to control a servo
-Servo servoV;
-
-LcdMenu lcdTest;
-
-Encoder enc1(CLK, DT, SW);  //Encoder object
-GTimer myTimer(MS);         //Timer for update data
-GTimer lcdTimeUpdate(MS);
-
-
-
-bool modeAuto = false;
-byte valH = 90, valV = 90;
-bool ServoDirection = false;
-const uint8_t digits = 3;
-
-// Menu Settings
-bool menuIsVisible = false;
-byte menuLvl = 0;
-byte menuScreen = 0;
-byte arrowPos = 1;
-String menuList[] = { "Time","Date","Pos","Mode" };
-
-
-
-//float posLong = EEPROM_float_read(0); //Read pos from EEPROM float (4 byte) addr 0-3     
-float posLong = 50.385214f; //Read pos from EEPROM float (4 byte) addr 0-3     
-//float posLat = EEPROM_float_read(4); // addr 4-8
-float posLat = 30.446535f; // addr 4-8
-
-
-SolarPosition Kiev(50.385214, 30.446535);  // Kiev, UA
-
-
-//SolarPosition Kiev(posLong, posLat);  // Kiev, UA
-
-
+//Custom chars for LCD
 byte Batery_stat_0[] = {
   B11111,
   B10000,
@@ -95,6 +61,44 @@ byte Batery_stat_2[] = {
 };
 
 
+//Servo Settings
+Servo servoH;  // create servo object to control a servo
+Servo servoV;
+byte valH = 90, valV = 90;
+bool ServoDirection = false;
+
+
+//Timer for update data
+GTimer myTimer(MS);         
+GTimer lcdTimeUpdate(MS); //not used
+
+
+// Menu Settings
+const uint8_t digits = 3;
+bool menuIsVisible = false;
+bool menuEdit = false;
+byte menuLvl = 0;
+byte menuScreen = 0;
+byte arrowPos = 1;
+String menuList[] = { "Time","Date","Pos","Mode" };
+
+LcdMenu lcdTest; //TEst
+
+
+//Global settings
+bool modeAuto = false;
+//float posLong = EEPROM_float_read(0); //Read pos from EEPROM float (4 byte) addr 0-3   
+//float posLat = EEPROM_float_read(4); // addr 4-8
+
+float posLong = 50.385214f; //Read pos from EEPROM float (4 byte) addr 0-3     
+float posLat = 30.446535f; // addr 4-8
+
+SolarPosition Kiev(50.385214, 30.446535);  // Kiev, UA
+
+//SolarPosition TEST;  // Test not init for make changes in code
+
+
+//SolarPosition Kiev(posLong, posLat);  // Kiev, UA
 
 void setup() {
 	Serial.begin(9600);
@@ -159,6 +163,7 @@ void loop() {
 		autoMoveSolarTracker(Kiev.getSolarPosition());
 
 		menuIsVisible = false;
+		lcd.noBacklight();
 
 		//Serial.print("BYTE = ");
 
@@ -189,49 +194,80 @@ void encoderClickEvents() {
 	if (!modeAuto && !menuIsVisible) {
 
 		if (enc1.isClick()) {
+			myTimer.reset();
+			lcd.backlight();
+
 			ServoDirection = !ServoDirection;
 			Serial.println(ServoDirection ? "Vertical" : "Horizontal");
 		}
+		
+		if (enc1.isTurn()) {
 
-		if (enc1.isRight()) {
-			//Serial.println("Right");
-			if (!ServoDirection && valH < 180)
-			{
-				valH++;
-				delay(15);
-			}
-			else if (ServoDirection && valV < 180)
-			{
-				valV++;
-				delay(15);
-			}
-			MoveSolarTracker(valH, valV);
-		}
-		if (enc1.isLeft()) {
+			lcd.backlight();
+			myTimer.reset();
 
-			if (!ServoDirection && valH > 0)
-			{
-				valH--;
-				delay(15);
+			if (enc1.isRight()) {
+				//Serial.println("Right");
+				if (!ServoDirection && valH < 180)
+				{
+					valH++;
+					delay(15);
+
+	
+				}
+				else if (ServoDirection && valV < 180)
+				{
+					valV++;
+					delay(15);
+
+				}
+				//MoveSolarTracker(valH, valV);
 			}
-			else if (ServoDirection && valV > 0)
-			{
-				valV--;
-				delay(15);
+			if (enc1.isLeft()) {
+
+				if (!ServoDirection && valH > 0)
+				{
+					valH--;
+					delay(15);
+				}
+				else if (ServoDirection && valV > 0)
+				{
+					valV--;
+					delay(15);
+				}
+				
 			}
+
+			if (valH == 99 || valV == 99) {
+				printTimeLCD(RTC.get());
+				printSolarPosition(Kiev.getSolarPosition(), digits);
+			}
+			else {
+				lcd.setCursor(7, 2);
+				lcd.print("H: ");
+				lcd.print(valH);
+				lcd.print(" V: ");
+				lcd.print(valV);
+			}
+
 			MoveSolarTracker(valH, valV);
+
+
 		}
 	}
 
+	//MENU Open
 
 	if (enc1.isHolded()) {
+		lcd.backlight();
+		myTimer.reset();
 		menuIsVisible = !menuIsVisible;
 		delay(15);
 		Serial.println("Menu");
 
 		if (menuIsVisible)
 		{
-			arrowPos = 0;
+			arrowPos = 1;
 			menuLvl = 1;
 			menuLcd();
 			delay(500);
@@ -241,11 +277,8 @@ void encoderClickEvents() {
 			menuLvl = 0;
 			printTimeLCD(RTC.get());
 			printSolarPosition(Kiev.getSolarPosition(), digits);
-			myTimer.reset();
 			delay(500);
 		}
-
-
 	}
 
 
@@ -255,43 +288,93 @@ void encoderClickEvents() {
 
 		if (enc1.isTurn()) {
 
-			if (enc1.isRight()) arrowPos++;
-			if (enc1.isLeft()) arrowPos--;
-
+		
 			if (menuLvl == 1) {
-				myTimer.reset();
-				
-				menuLcd();
-				
+				if (enc1.isRight()) arrowPos++;
+				if (enc1.isLeft()) arrowPos--;
+				myTimer.reset();	
+				menuLcd();	
+			}
+			else if (menuLvl == 2)
+			{
+				if (menuScreen == 1 ) {
+
+				}else if (menuScreen == 2 ) {
+
+				}
 			}
 
 		}
+
+
+
+
 
 		if (enc1.isClick()) {
 			
-			
+			myTimer.reset();
+
+
 			if (arrowPos == 0) {
 				menuLvl--;
+			}
+			if (menuLvl == 0) {
+				menuIsVisible = !menuIsVisible;
+				printTimeLCD(RTC.get());
+				printSolarPosition(Kiev.getSolarPosition(), digits);
+				delay(500);
+			}
+			else if (menuLvl == 1) {
 
-			}else{
-				if(arrowPos!=4)
-				menuLvl++;
+				if (arrowPos == 1) {
+					menuLvl++;
+					menuScreen == arrowPos;
+					arrowPos = 1;
+					menuLcdTimeSettings(RTC.get());
+					//menuEdit = true;                  //Enable edit mode
+				}
+				else if (arrowPos == 2) {
+					menuLvl++;
+				}
+				else if (arrowPos == 3) {
+					menuLvl++;
+				}
+				else if (arrowPos == 4) {
+					//menuLvl++;
+					modeAuto = !modeAuto;
+					menuLcd();
+					autoMoveSolarTracker(Kiev.getSolarPosition());
+				}
+
+			}
+			
+			else if (menuLvl==2)
+			{
+				if (menuScreen == 1)
+				{
+
+
+				}
+
 			}
 
 
-
-
-			
-			menuScreen = arrowPos;
-			arrowPos = 1;
-			menuLcd();
+			//menuScreen = arrowPos;
+			//arrowPos = 1;
+			//menuLcd();
 
 		}
+
 
 
 		if (enc1.isRightH()) Serial.println("Right holded");
 		if (enc1.isLeftH()) Serial.println("Left holded ");
 	}
+
+
+
+
+
 }
 
 
@@ -328,22 +411,22 @@ void MoveSolarTracker(byte H, byte V) {
 
 void printSolarPosition(SolarPosition_t pos, int numDigits)
 {
-	Serial.print(F("el: "));
-	Serial.print(pos.elevation, numDigits);
-	Serial.print(F(" deg\t"));
+	//Serial.print(F("el: "));
+	//Serial.print(pos.elevation, numDigits);
+	//Serial.print(F(" deg\t"));
 	lcd.setCursor(0, 1);
 	lcd.print("H ");
 	lcd.print(pos.elevation);
 
-	Serial.print(F("az: "));
-	Serial.print(pos.azimuth, numDigits);
-	Serial.println(F(" deg"));
+	//Serial.print(F("az: "));
+	//Serial.print(pos.azimuth, numDigits);
+	//Serial.println(F(" deg"));
 	lcd.print(" A ");
 	lcd.print(pos.azimuth);
 
 
-	Serial.println(int(135 - pos.elevation));
-	Serial.println(map(pos.azimuth, 90, 270, 180, 0));
+	//Serial.println(int(135 - pos.elevation));
+	//Serial.println(map(pos.azimuth, 90, 270, 180, 0));
 }
 
 void printTimeLCD(time_t t)
@@ -353,17 +436,34 @@ void printTimeLCD(time_t t)
 
 	lcd.clear();
 	lcd.setCursor(0, 0);
-
-	if (modeAuto) {
-		lcd.print("AUTO ");
-
+	
+	if (someTime.Day < 10) {
+		lcd.print("0");
 	}
-	else {
-		lcd.print("MANUAL ");
+	lcd.print(someTime.Day);
+	lcd.print("/");
+
+	if (someTime.Month<10)
+	{
+		lcd.print("0");
+	}
+	lcd.print(someTime.Month);
+	lcd.print(" ");
+
+	if (someTime.Hour < 10)
+	{
+		lcd.print("0");
 	}
 	lcd.print(someTime.Hour);
+
 	lcd.print(":");
+	if (someTime.Minute < 10)
+	{
+		lcd.print("0");
+	}
 	lcd.print(someTime.Minute);
+
+	
 	//  lcd.print(":");
 	//  lcd.print(someTime.Second);
 	lcd.print(" UTC");
@@ -372,6 +472,23 @@ void printTimeLCD(time_t t)
 	lcd.write(0);
 	lcd.write(1);
 	lcd.write(2);
+
+	lcd.setCursor(0, 2);
+	//lcd.print("Mode: ");
+	if (modeAuto) {
+		lcd.print("AUTO ");
+
+	}
+	else {
+		lcd.print("MANUAL ");
+	}
+
+	lcd.setCursor(7, 2);
+	lcd.print("H: ");
+	lcd.print(valH);
+	lcd.print(" V: ");
+	lcd.print(valV);
+
 
 }
 
@@ -400,10 +517,12 @@ void menuLcd() {
 
 	lcd.clear();
 	lcdArrow();
-	lcd.setCursor(1, 0); lcd.print(menuList[0]);
-	lcd.setCursor(1, 1); lcd.print(menuList[1]);
-	lcd.setCursor(9, 0); lcd.print(menuList[2]);
-	lcd.setCursor(9, 1); lcd.print(menuList[3]);
+	lcd.setCursor(0, 0); lcd.print("...");
+	lcd.setCursor(6, 0); lcd.print("SETTINGS");
+	lcd.setCursor(1, 1); lcd.print(menuList[0]);
+	lcd.setCursor(1, 2); lcd.print(menuList[1]);
+	lcd.setCursor(9, 1); lcd.print(menuList[2]);
+	lcd.setCursor(9, 2); lcd.print(menuList[3]);
 	lcd.print("-");
 
 	modeAuto ? lcd.print("A") : lcd.print("M");
@@ -411,37 +530,56 @@ void menuLcd() {
 
 void lcdArrow() {
 	switch (arrowPos) {                    //arrow print 
-	case 0: lcd.setCursor(0, 0);
+	case 0: lcd.setCursor(3, 0);
 		lcd.write(127);
 		break;
-	case 1: lcd.setCursor(0, 0);
+	case 1: lcd.setCursor(0, 1);
 		lcd.write(126);
 		break;
-	case 2: lcd.setCursor(0, 1);
+	case 2: lcd.setCursor(0, 2);
 		lcd.write(126);
 		break;
-	case 3: lcd.setCursor(8, 0);
+	case 3: lcd.setCursor(8, 1);
 		lcd.write(126);
 		break;
-	case 4: lcd.setCursor(8, 1);
+	case 4: lcd.setCursor(8, 2);
 		lcd.write(126);
 		break;
-
 	}
 }
 
-
 void menuLcdTimeSettings(time_t t) {
 	tmElements_t someTime;
-	
+	breakTime(t, someTime);
 	lcd.clear();
-	lcd.print("Time: ");
-	lcd.setCursor(0, 0);
+
+	//lcdArrow();
+
+
+	lcd.setCursor(2, 0);
+	lcd.print("| Time Settings |");
+	lcd.setCursor(3, 2);
+
+	if (someTime.Hour < 10)
+	{
+		lcd.print("0");
+	}
 	lcd.print(someTime.Hour);
 	lcd.print(":");
-	lcd.print(someTime.Minute);
-}
 
+	if (someTime.Minute < 10)
+	{
+		lcd.print("0");
+	}
+	lcd.print(someTime.Minute);
+	lcd.print(":");
+
+	if (someTime.Second < 10) {
+		lcd.print("0");
+	}
+	lcd.print(someTime.Second);
+	lcd.print(F(" UTC"));
+}
 
 void EEPROM_float_write(int addr, float val) // çàïèñü â ÅÅÏÐÎÌ
 {
