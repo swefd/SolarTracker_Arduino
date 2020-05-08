@@ -86,6 +86,9 @@ LcdMenu lcdTest; //TEst
 
 
 //Global settings
+tmElements_t editTime;    //Time edit for time settings settings
+
+
 bool modeAuto = false;
 //float posLong = EEPROM_float_read(0); //Read pos from EEPROM float (4 byte) addr 0-3   
 //float posLat = EEPROM_float_read(4); // addr 4-8
@@ -104,6 +107,8 @@ void setup() {
 	Serial.begin(9600);
 
 	SolarPosition::setTimeProvider(RTC.get);
+
+	setSyncProvider(RTC.get);
 
 	Serial.println(lcdTest.getText());
 
@@ -176,6 +181,8 @@ void loop() {
 		autoMoveSolarTracker(Kiev.getSolarPosition());
 
 		menuIsVisible = false;
+		menuEdit = false;
+
 		lcd.noBacklight();
 		Timer1sec.stop();
 
@@ -198,7 +205,8 @@ void loop() {
 
 	if (Timer1sec.isReady() && menuLvl == 2 && menuScreen == 1) {
 
-		menuLcdTimeSettings(RTC.get());
+		//editTime = getElementTime(now());
+		menuLcdTimeSettings(getElementTime(now()));
 
 	}
 
@@ -313,13 +321,121 @@ void encoderClickEvents() {
 			}
 			else if (menuLvl == 2)
 			{
+												//Time Settings
 				if (menuScreen == 1 ) {
-					if (enc1.isRight()) arrowPos++;
-					if (enc1.isLeft()) arrowPos--;
-					menuLcdTimeSettings(RTC.get());
+
+					if (menuEdit) {				//Time Edit in menu
+
+						if (arrowPos == 1) {
+							
+							if (enc1.isRight()) {           //Hour ++
+
+								editTime.Hour++;
+								if (editTime.Hour > 23)
+									editTime.Hour = 0;	
+								Serial.println(editTime.Hour);
+							}
+
+
+							if (enc1.isLeft()) {
+
+								editTime.Hour--;
+								if (editTime.Hour > 23)
+									editTime.Hour = 23;
+								
+								Serial.println(editTime.Hour);
+							}
+
+
+						}
+						else if (arrowPos == 2) {
+							if (enc1.isRight()) editTime.Minute++;
+								if (editTime.Minute == 61) editTime.Minute = 0;
+
+							if (enc1.isLeft()) editTime.Minute--;
+								if (editTime.Minute > 61) editTime.Minute = 60;
+							
+						}
+						else if (arrowPos == 3) {
+							if (enc1.isRight()) {
+								editTime.Second++;
+								if (editTime.Second == 61) editTime.Second = 0;
+							}
+							if (enc1.isLeft()) {
+								editTime.Second--;
+								if (editTime.Second > 61) editTime.Second = 60;
+							}
+						}
+
+						//menuLcdTimeSettings(editTime);
+					}
+					else
+					{
+						if (enc1.isRight()) arrowPos++;
+						if (enc1.isLeft()) arrowPos--;
+					}
+
+					//menuLcdTimeSettings(getElementTime(now()));
+					menuLcdTimeSettings(editTime);
 					//lcdArrow();
 
-				}else if (menuScreen == 2 ) {
+
+					
+				}    
+				
+												//Date Settings 
+				else if (menuScreen == 2 ) {			                   
+
+					if (menuEdit) {				//Date Edit in menu
+
+						if (arrowPos == 1) {
+
+							if (enc1.isRight()) {           //Day ++
+
+								editTime.Day++;
+								if (editTime.Day > 31)
+									editTime.Hour = 0;	
+							}
+
+
+							if (enc1.isLeft()) {			//Day--
+
+								editTime.Day--;
+								if (editTime.Day > 31)
+									editTime.Day = 31;
+							}
+
+
+						}
+						else if (arrowPos == 2) {
+							if (enc1.isRight()) editTime.Month++;		//Month
+							if (editTime.Month == 13) editTime.Month = 0;
+
+							if (enc1.isLeft()) editTime.Month--;
+							if (editTime.Month > 13) editTime.Month = 12;
+
+						}
+						else if (arrowPos == 3) {					
+							if (enc1.isRight()) {							//Year
+								editTime.Year++;
+							}
+							if (enc1.isLeft()) {
+								editTime.Year--;
+							}
+						}
+
+						//menuLcdTimeSettings(editTime);
+					}
+					else
+					{
+						if (enc1.isRight()) arrowPos++;
+						if (enc1.isLeft()) arrowPos--;
+					}
+
+					//menuLcdTimeSettings(getElementTime(now()));
+					menuLcdDateSettings(editTime);
+					//lcdArrow();
+
 
 				}
 			}
@@ -347,18 +463,22 @@ void encoderClickEvents() {
 
 				}
 
-
-				if (arrowPos == 1) {
+													//Go to Time Settings
+				if (arrowPos == 1) {      
 					menuScreen = 1;
 					menuLvl++;
 					arrowPos = 1;
-					menuLcdTimeSettings(RTC.get());
-					Timer1sec.setInterval(1000);
-					
-					//menuEdit = true;                  //Enable edit mode
+					editTime = getElementTime(now());
+					menuLcdTimeSettings(editTime);
+
 				}
-				else if (arrowPos == 2) {
+													//Go to Date Settings
+				else if (arrowPos == 2) {		
+					menuScreen = 2;
 					menuLvl++;
+					arrowPos = 1;
+					editTime = getElementTime(now());
+					menuLcdDateSettings(editTime);
 				}
 				else if (arrowPos == 3) {
 					menuLvl++;
@@ -374,28 +494,63 @@ void encoderClickEvents() {
 			
 			else if (menuLvl==2)
 			{
-				if (menuScreen == 1)
+				if (menuScreen == 1)				//Time Settings Click
 				{
 					if (arrowPos == 0) {
 						menuLvl--;
 						menuScreen = 0;
 						menuLcd();
-						Timer1sec.stop();
-					}
-					else if (arrowPos == 1) {
-
-					}
-					else if (arrowPos == 2) {
-						
-					}
-					else if (arrowPos == 3) {
-					
+						//Timer1sec.stop();
 					}
 					else if (arrowPos == 4) {
-						//menuLvl++;
-						modeAuto = !modeAuto;
+						arrowPos = 1;
+						setRtcTime(editTime);
+						menuLvl--;
+						menuScreen = 0;
 						menuLcd();
-						autoMoveSolarTracker(Kiev.getSolarPosition());
+						//Timer1sec.setInterval(1000);
+					}
+					
+					else {       // arrow 1-3
+						menuEdit = !menuEdit;
+						delay(15);
+						menuLcdTimeSettings(editTime);
+						//Timer1sec.stop();
+						//if (menuEdit) {
+						//	Timer1sec.stop();
+						//}else{
+						//	Timer1sec.start();
+						//}
+
+					}
+				}
+				else if (menuScreen == 2) {				//Date settings Click
+					if (arrowPos == 0) {
+						menuLvl--;
+						menuScreen = 0;
+						menuLcd();
+						//Timer1sec.stop();
+					}
+					else if (arrowPos == 4) {
+						arrowPos = 2;
+						setRtcTime(editTime);
+						menuLvl--;
+						menuScreen = 0;
+						menuLcd();
+						//Timer1sec.setInterval(1000);
+					}
+
+					else {       // arrow 1-3
+						menuEdit = !menuEdit;
+						delay(15);
+						menuLcdDateSettings(editTime);
+						//Timer1sec.stop();
+						//if (menuEdit) {
+						//	Timer1sec.stop();
+						//}else{
+						//	Timer1sec.start();
+						//}
+
 					}
 
 
@@ -599,23 +754,32 @@ void lcdArrow() {
 		}
 	}
 
-	else if (menuLvl == 2 && menuScreen == 1) {
-		switch (arrowPos) {                    //arrow print 
-		case 0: lcd.setCursor(3, 0);
-			lcd.write(127);
-			break;
-		case 1: lcd.setCursor(3, 1);
-			lcd.write(60);
-			lcd.write(62);
-			break;
-		case 2: lcd.setCursor(6, 1);
-			lcd.write(60);
-			lcd.write(62);
-			break;
-		case 3: lcd.setCursor(9, 1);
-			lcd.write(60);
-			lcd.write(62);
-			break;
+	else if (menuLvl == 2) {
+		if (menuScreen == 1 || menuScreen == 2) {
+			if (arrowPos > 4)
+				arrowPos = 0;
+
+			switch (arrowPos) {                    //arrow print 
+			case 0: lcd.setCursor(3, 0);
+				lcd.write(127);
+				break;
+			case 1: lcd.setCursor(3, 1);
+				lcd.write(60);
+				lcd.write(62);
+				break;
+			case 2: lcd.setCursor(6, 1);
+				lcd.write(60);
+				lcd.write(62);
+				break;
+			case 3: lcd.setCursor(9, 1);
+				lcd.write(60);
+				if (menuScreen == 2) lcd.setCursor(12, 1); //Date x4 char
+				lcd.write(62);
+				break;
+			case 4: lcd.setCursor(16, 3);
+				lcd.write(126);
+				break;
+			}
 		}
 
 	}
@@ -626,9 +790,8 @@ void lcdArrow() {
 
 }
 
-void menuLcdTimeSettings(time_t t) {
-	tmElements_t someTime;
-	breakTime(t, someTime);
+void menuLcdTimeSettings(tmElements_t someTime) {
+
 	lcd.clear();
 
 	lcdArrow();
@@ -639,8 +802,13 @@ void menuLcdTimeSettings(time_t t) {
 
 	lcd.setCursor(4, 0);
 	lcd.print("TIME SETTINGS");
-	lcd.setCursor(3, 2);
 
+	if (menuEdit) {
+		lcd.setCursor(2, 2);
+		lcd.print('*');
+	}
+
+	lcd.setCursor(3, 2);
 	if (someTime.Hour < 10)
 	{
 		lcd.print("0");
@@ -660,7 +828,78 @@ void menuLcdTimeSettings(time_t t) {
 	}
 	lcd.print(someTime.Second);
 	lcd.print(F(" UTC"));
+	lcd.setCursor(17, 3);
+	lcd.print("OK");
 }
+
+
+
+void menuLcdDateSettings(tmElements_t someTime) {
+
+	lcd.clear();
+
+	lcdArrow();
+
+
+	lcd.setCursor(0, 0);
+	lcd.print("...");
+
+	lcd.setCursor(4, 0);
+	lcd.print("DATE SETTINGS");
+
+	if (menuEdit) {
+		lcd.setCursor(2, 2);
+		lcd.print('*');
+	}
+
+	lcd.setCursor(3, 2);
+	if (someTime.Day < 10)
+	{
+		lcd.print("0");
+	}
+	lcd.print(someTime.Day);
+	lcd.print("/");
+
+	if (someTime.Month < 10)
+	{
+		lcd.print("0");
+	}
+	lcd.print(someTime.Month);
+	lcd.print("/");
+
+	lcd.print(tmYearToCalendar(someTime.Year));
+	//lcd.print(F(" UTC"));
+	lcd.setCursor(17, 3);
+	lcd.print("OK");
+}
+
+
+
+void setRtcTime(tmElements_t tm) {
+
+	time_t et;
+
+	//int y = year(); //Need edit
+
+	//if (year() >= 1000)
+	//	tm.Year = CalendarYrToTm(year());
+	//else    // (y < 100)
+	//	tm.Year = y2kYearToTm(year());
+	//tm.Month = month();
+	//tm.Day = day();
+
+	et = makeTime(tm);
+	RTC.set(et);        // use the time_t value to ensure correct weekday is set
+	setTime(et);
+}
+
+
+tmElements_t getElementTime(time_t t) {
+	tmElements_t res;
+	breakTime(t, res);
+	return res;
+}
+
 
 void EEPROM_float_write(int addr, float val) // çàïèñü â ÅÅÏÐÎÌ
 {
