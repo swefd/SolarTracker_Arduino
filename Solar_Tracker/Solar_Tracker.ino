@@ -490,6 +490,7 @@ void encoderClickEvents() {
 									posLong = 0;
 							}
 
+
 							if (enc1.isLeft()) {			//PosLong-- .0001
 
 								posLong-= .0001;
