@@ -3,9 +3,6 @@
  Created:	5/1/2020 5:32:21 PM
  Author:	swefd
 */
-//#include <Wire.h>
-//#include <Time.h>
-//#include <SPI.h>
 
 #include <Wire.h>
 #include "SDL_Arduino_INA3221.h"
@@ -17,7 +14,7 @@
 #include <LiquidCrystal_I2C.h>
 #include <TimeLib.h>
 #include <EEPROM.h>
-#include "LcdMenu.h"
+//#include "LcdMenu.h"
 
 
 
@@ -52,6 +49,29 @@ byte Batery_stat[][8] = {
 
 };      //Byte-Array of Custom charters for battery status
 
+byte ArrowUp[] = {
+  B00100,
+  B01110,
+  B11111,
+  B00100,
+  B00100,
+  B00100,
+  B00100,
+  B00000
+};
+
+byte ArrowDown[] = {
+  B00000,
+  B00100,
+  B00100,
+  B00100,
+  B00100,
+  B11111,
+  B01110,
+  B00100
+};
+
+
 
 //Voltage sensor
 SDL_Arduino_INA3221 ina3221;
@@ -83,7 +103,7 @@ byte menuScreen = 0;
 byte arrowPos = 1;
 String menuList[] = { "Time","Date","Pos","Mode" };
 
-LcdMenu lcdTest; //TEst
+//LcdMenu lcdTest; //TEst
 
 
 //Global settings
@@ -126,8 +146,10 @@ void setup() {
 
 	lcd.home();
 	delay(100);
-	lcd.backlight();
+	lcd.createChar(3, ArrowUp);			//Create custom chars
+	lcd.createChar(4, ArrowDown);
 
+	lcd.backlight();					//Turn up back light
 
 	lcd.setCursor(1, 1);
 	lcd.print("Solar Track System");
@@ -135,6 +157,7 @@ void setup() {
 	lcd.print("dev. by SWEFD");
 	lcd.setCursor(16, 3);
 	lcd.print("v1.1");
+							
 
 
 	//Start
@@ -413,12 +436,168 @@ void encoderClickEvents() {
 						if (enc1.isLeft()) arrowPos--;
 					}
 
+
 					//menuLcdTimeSettings(getElementTime(now()));
 					menuLcdDateSettings(editTime);
 					//lcdArrow();
 
 
 				}
+															//POS Settings 
+
+				else if (menuScreen == 3 ) {			                   
+
+					if (menuEdit) {				//Date Edit in menu
+
+						if (arrowPos == 1) {
+
+							if (enc1.isRight()) {           //posLong++
+
+								posLong++;
+								if (posLong > 180)
+									posLong = 0;
+							}
+
+							if (enc1.isLeft()) {			//PosLong--
+
+								posLong--;
+								if (posLong < 0)
+									posLong = 180;
+							}
+						}
+						else if (arrowPos == 2) {
+
+							if (enc1.isRight()) {           //posLong+ .01
+
+								posLong += .01;
+								if (posLong > 180)
+									posLong = 0;
+							}
+
+							if (enc1.isLeft()) {			//PosLong-- .01
+
+								posLong-= .01;
+								if (posLong < 0)
+									posLong = 180;
+							}
+						}
+						else if (arrowPos == 3) {
+
+							if (enc1.isRight()) {           //posLong+ .0001
+
+								posLong += .0001;
+								if (posLong > 180)
+									posLong = 0;
+							}
+
+							if (enc1.isLeft()) {			//PosLong-- .0001
+
+								posLong-= .0001;
+								if (posLong < 0)
+									posLong = 180;
+							}
+						}
+						else if (arrowPos == 4) {
+
+							if (enc1.isRight()) {           //posLong+ .000001
+
+								posLong += .000001;
+								if (posLong > 180)
+									posLong = 0;
+							}
+
+							if (enc1.isLeft()) {			//PosLong-- .000001
+
+								posLong-= .000001;
+								if (posLong < 0)
+									posLong = 180;
+							}
+						}
+						else if (arrowPos == 5) {
+
+							if (enc1.isRight()) {           //posLat++
+
+								posLat++;
+								if (posLat > 180)
+									posLat = 0;
+							}
+
+							if (enc1.isLeft()) {			//posLat--
+
+								posLat--;
+								if (posLat < 0)
+									posLat = 180;
+							}
+						}
+						else if (arrowPos == 6) {
+
+							if (enc1.isRight()) {           //posLat+ .01
+
+								posLat += .01;
+								if (posLat > 180)
+									posLat = 0;
+							}
+
+							if (enc1.isLeft()) {			//posLat-- .01
+
+								posLat-= .01;
+								if (posLat < 0)
+									posLat = 180;
+							}
+						}
+						else if (arrowPos == 7) {
+
+							if (enc1.isRight()) {           //posLat+ .0001
+
+								posLat += .0001;
+								if (posLat > 180)
+									posLat = 0;
+							}
+
+							if (enc1.isLeft()) {			//posLat-- .0001
+
+								posLat-= .0001;
+								if (posLat < 0)
+									posLat = 180;
+							}
+						}
+						else if (arrowPos == 8) {
+
+							if (enc1.isRight()) {           //posLat+ .000001
+
+								posLat += .000001;
+								if (posLat > 180)
+									posLat = 0;
+							}
+
+							if (enc1.isLeft()) {			//posLat-- .000001
+
+								posLat-= .000001;
+								if (posLat < 0)
+									posLat = 180;
+							}
+						}
+
+						menuLcdPosSettings();
+					}
+					else
+					{
+						if (enc1.isRight()) arrowPos++;
+						if (enc1.isLeft()) arrowPos--;
+					}
+
+
+					//menuLcdTimeSettings(getElementTime(now()));
+					menuLcdPosSettings();
+					//lcdArrow();
+
+
+				}
+
+
+
+
+
 			}
 
 		}
@@ -461,6 +640,9 @@ void encoderClickEvents() {
 				}
 				else if (arrowPos == 3) {
 					menuLvl++;
+					menuScreen = 3;
+					arrowPos = 1;
+					menuLcdPosSettings();
 				}
 				else if (arrowPos == 4) {
 					//menuLvl++;
@@ -523,6 +705,38 @@ void encoderClickEvents() {
 						menuEdit = !menuEdit;
 						delay(15);
 						menuLcdDateSettings(editTime);
+						//Timer1sec.stop();
+						//if (menuEdit) {
+						//	Timer1sec.stop();
+						//}else{
+						//	Timer1sec.start();
+						//}
+
+					}
+
+
+				}
+				
+				else if (menuScreen == 3) {				//POS settings Click
+					if (arrowPos == 0) {
+						menuLvl--;
+						menuScreen = 0;
+						menuLcd();
+						//Timer1sec.stop();
+					}
+					else if (arrowPos == 9) {
+						/*arrowPos = 2;
+						setRtcTime(editTime);
+						menuLvl--;
+						menuScreen = 0;
+						menuLcd();*/
+						//Timer1sec.setInterval(1000);
+					}
+
+					else {       // arrow 1-3
+						menuEdit = !menuEdit;
+						delay(15);
+						menuLcdPosSettings();
 						//Timer1sec.stop();
 						//if (menuEdit) {
 						//	Timer1sec.stop();
@@ -871,6 +1085,57 @@ void lcdArrow() {
 				break;
 			}
 		}
+		
+		if (menuScreen == 3) {
+
+			if (arrowPos > 9)
+				arrowPos = 0;
+
+			switch (arrowPos) {                    //arrow print 
+			case 0: lcd.setCursor(3, 0);
+				lcd.write(127);
+				break;
+			case 1: lcd.setCursor(6, 2);
+				lcd.write(3);
+				lcd.write(3);
+				break;
+			case 2: lcd.setCursor(9, 2);
+				lcd.write(3);
+				lcd.write(3);
+				break;
+			case 3: lcd.setCursor(11, 2);
+				lcd.write(3);
+				lcd.write(3);
+				break;
+			case 4: lcd.setCursor(13, 2);
+				lcd.write(3);
+				lcd.write(3);
+				break;
+			case 5: lcd.setCursor(6, 2);
+				lcd.write(4);
+				lcd.write(4);
+				break;
+			case 6: lcd.setCursor(9, 2);
+				lcd.write(4);
+				lcd.write(4);
+				break;
+			case 7: lcd.setCursor(11, 2);
+				lcd.write(4);
+				lcd.write(4);
+				break;
+			case 8: lcd.setCursor(13, 2);
+				lcd.write(4);
+				lcd.write(4);
+				break;
+			case 9: lcd.setCursor(16, 3);
+				lcd.write(126);
+				break;
+
+			}
+		}
+
+
+
 
 	}
 
@@ -965,6 +1230,38 @@ void menuLcdDateSettings(tmElements_t someTime) {
 
 
 
+void menuLcdPosSettings() {
+
+	lcd.clear();
+
+	lcdArrow();
+
+
+	lcd.setCursor(0, 0);
+	lcd.print("...");
+
+	lcd.setCursor(5, 0);
+	lcd.print("POS SETTINGS");
+
+	if (menuEdit) {
+		lcd.setCursor(0, 2);
+		lcd.print("****");
+	}
+
+	lcd.setCursor(0, 1);
+	lcd.print("Long: ");
+	lcd.print(posLong,6);
+
+	lcd.setCursor(0, 3);
+	lcd.print("Lat:  ");
+	lcd.print(posLat,6);
+
+	lcd.setCursor(17, 3);
+	lcd.print("OK");
+}
+
+
+
 void setRtcTime(tmElements_t tm) {
 
 	time_t et;
@@ -989,7 +1286,6 @@ tmElements_t getElementTime(time_t t) {
 	breakTime(t, res);
 	return res;
 }
-
 
 void EEPROM_float_write(int addr, float val) // çàïèñü â ÅÅÏÐÎÌ
 {
