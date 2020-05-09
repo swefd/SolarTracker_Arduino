@@ -7,6 +7,8 @@
 //#include <Time.h>
 //#include <SPI.h>
 
+#include <Wire.h>
+#include "SDL_Arduino_INA3221.h"
 #include <DS3232RTC.h>
 #include <Servo.h>
 #include <SolarPosition.h>
@@ -16,6 +18,8 @@
 #include <TimeLib.h>
 #include <EEPROM.h>
 #include "LcdMenu.h"
+
+
 
 //Encoder settings
 #define SW 4     
@@ -27,41 +31,38 @@ Encoder enc1(CLK, DT, SW);  //Encoder object
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 
 //Custom chars for LCD
-byte Batery_stat_0[] = {
-  B11111,
-  B10000,
-  B10111,
-  B10111,
-  B10111,
-  B10111,
-  B10000,
-  B11111
-};
+byte Batery_stat[][8] = { 
 
-byte Batery_stat_1[] = {
-  B11111,
-  B00000,
-  B11111,
-  B11111,
-  B11111,
-  B11111,
-  B00000,
-  B11111
-};
+	//BAT1 1
+	{B11111,B10000,B10000,B10000,B10000,B10000,B10000,B11111}, //bat 1 0%
+	{B11111,B10000,B10100,B10100,B10100,B10100,B10000,B11111}, //10%
+	{B11111,B10000,B10110,B10110,B10110,B10110,B10000,B11111}, //20%
+	{B11111,B10000,B10111,B10111,B10111,B10111,B10000,B11111}, //30%
+	//BAT 2
+	{B11111,B00000,B00000,B00000,B00000,B00000,B00000,B11111}, //Bat 2 <40%
+	{B11111,B00000,B10000,B10000,B10000,B10000,B00000,B11111}, //40%
+	{B11111,B00000,B11000,B11000,B11000,B11000,B00000,B11111}, //50%
+	{B11111,B00000,B11100,B11100,B11100,B11100,B00000,B11111}, //60%
+	{B11111,B00000,B11110,B11110,B11110,B11110,B00000,B11111}, //70%
+	{B11111,B00000,B11111,B11111,B11111,B11111,B00000,B11111}, //80%
+	//BAT 3
+	{B11110,B00010,B00010,B00011,B00011,B00010,B00010,B11110}, //Bat 3 <90%
+	{B11110,B00010,B10010,B10011,B10011,B10010,B00010,B11110}, //90%
+	{B11110,B00010,B11010,B11011,B11011,B11010,B00010,B11110}, //100%
 
-byte Batery_stat_2[] = {
-  B11110,
-  B00010,
-  B11010,
-  B11011,
-  B11011,
-  B11010,
-  B00010,
-  B11110
-};
+};      //Byte-Array of Custom charters for battery status
 
+
+//Voltage sensor
+SDL_Arduino_INA3221 ina3221;
+float shuntvoltage1 = 0;
+float busvoltage1 = 0;
+float current_mA1 = 0;
+float loadvoltage1 = 0;
 
 //Servo Settings
+#define SERVO_H_PIN 8
+#define SERVO_V_PIN 9
 Servo servoH;  // create servo object to control a servo
 Servo servoV;
 byte valH = 90, valV = 90;
@@ -105,57 +106,40 @@ SolarPosition Kiev(50.385214, 30.446535);  // Kiev, UA
 
 void setup() {
 	Serial.begin(9600);
-
-	SolarPosition::setTimeProvider(RTC.get);
+	ina3221.begin();
 
 	setSyncProvider(RTC.get);
+	SolarPosition::setTimeProvider(RTC.get);
 
-	Serial.println(lcdTest.getText());
+	servoH.attach(SERVO_H_PIN);  // attaches the servo on pin 8-9 to the servo object
+	servoV.attach(SERVO_V_PIN);
 
-	Serial.println("START kurwa");
-
-	servoH.attach(8);  // attaches the servo on pin 9 to the servo object
-	servoV.attach(9);
-
-	Serial.println("1");
 
 	enc1.setType(TYPE1);
 
 	myTimer.setInterval(10000);         //Timers set
 
-	Serial.println("2");
 
 	//lcd.home();
 	delay(100);
 	lcd.init();
-	lcd.createChar(0, Batery_stat_0);
-	lcd.createChar(1, Batery_stat_1);
-	lcd.createChar(2, Batery_stat_2);
+
 	lcd.home();
-	Serial.println("3");
-	//lcd.begin(20, 4);
 	delay(100);
-	Serial.println("4");
 	lcd.backlight();
-	Serial.println("5");
-	lcd.setCursor(0, 0);
-	Serial.println("6");
-	lcd.print("Hello");
-	lcd.setCursor(0, 1);
-	lcd.print("MADAFAKA :)");
 
 
+	lcd.setCursor(1, 1);
+	lcd.print("Solar Track System");
+	lcd.setCursor(0, 3);
+	lcd.print("dev. by SWEFD");
+	lcd.setCursor(16, 3);
+	lcd.print("v1.1");
 
 
 	//Start
-	delay(2000);
-	printTime(RTC.get());
-	printTimeLCD(RTC.get());
-	printSolarPosition(Kiev.getSolarPosition(), digits);
-	autoMoveSolarTracker(Kiev.getSolarPosition());
-	
-
-
+	delay(3000);
+	printMainScreenLCD();
 
 	//EEPROM_float_write(0, posLong);
 	//EEPROM_float_write(4, posLat);
@@ -174,11 +158,7 @@ void loop() {
 
 	if (myTimer.isReady()) {
 
-		printTime(RTC.get());
-		Serial.print(F("Kiev:\t"));
-		printTimeLCD(RTC.get());
-		printSolarPosition(Kiev.getSolarPosition(), digits);
-		autoMoveSolarTracker(Kiev.getSolarPosition());
+		printMainScreenLCD();
 
 		menuIsVisible = false;
 		menuEdit = false;
@@ -264,8 +244,9 @@ void encoderClickEvents() {
 			}
 
 			if (valH == 99 || valV == 99) {
-				printTimeLCD(RTC.get());
-				printSolarPosition(Kiev.getSolarPosition(), digits);
+				/*printTimeLCD(RTC.get());
+				printSolarPosition(Kiev.getSolarPosition(), digits);*/
+				printMainScreenLCD();
 			}
 			else {
 				lcd.setCursor(7, 2);
@@ -276,7 +257,6 @@ void encoderClickEvents() {
 			}
 
 			MoveSolarTracker(valH, valV);
-
 
 		}
 	}
@@ -300,8 +280,9 @@ void encoderClickEvents() {
 		else
 		{
 			menuLvl = 0;
-			printTimeLCD(RTC.get());
-			printSolarPosition(Kiev.getSolarPosition(), digits);
+			/*printTimeLCD(RTC.get());
+			printSolarPosition(Kiev.getSolarPosition(), digits);*/
+			printMainScreenLCD();
 			delay(500);
 		}
 	}
@@ -445,20 +426,18 @@ void encoderClickEvents() {
 
 
 
-
 		if (enc1.isClick()) {
 			
 			myTimer.reset();
-
-
 
 			if (menuLvl == 1) {
 
 				if (arrowPos == 0) {
 					menuLvl--;
 					menuIsVisible = !menuIsVisible;
-					printTimeLCD(RTC.get());
-					printSolarPosition(Kiev.getSolarPosition(), digits);
+					/*printTimeLCD(RTC.get());
+					printSolarPosition(Kiev.getSolarPosition(), digits);*/
+					printMainScreenLCD();
 					delay(500);
 
 				}
@@ -566,16 +545,15 @@ void encoderClickEvents() {
 		}
 
 
-
-		if (enc1.isRightH()) Serial.println("Right holded");
+		if (enc1.isRightH()) Serial.println("Right holded");    //Test
 		if (enc1.isLeftH()) Serial.println("Left holded ");
 	}
 
 
 
-
-
 }
+
+
 
 
 
@@ -609,24 +587,26 @@ void MoveSolarTracker(byte H, byte V) {
 	Serial.println(V);
 }
 
+
+void printMainScreenLCD() {
+	printTime(RTC.get());
+	Serial.print(F("Kiev:\t"));
+	printTimeLCD(RTC.get());
+	printVoltageLCD();
+	printBatteryStatusLCD();
+	printSolarPosition(Kiev.getSolarPosition(), digits);
+	autoMoveSolarTracker(Kiev.getSolarPosition());
+}
+
+
 void printSolarPosition(SolarPosition_t pos, int numDigits)
 {
-	//Serial.print(F("el: "));
-	//Serial.print(pos.elevation, numDigits);
-	//Serial.print(F(" deg\t"));
 	lcd.setCursor(0, 1);
 	lcd.print("H ");
 	lcd.print(pos.elevation);
 
-	//Serial.print(F("az: "));
-	//Serial.print(pos.azimuth, numDigits);
-	//Serial.println(F(" deg"));
 	lcd.print(" A ");
 	lcd.print(pos.azimuth);
-
-
-	//Serial.println(int(135 - pos.elevation));
-	//Serial.println(map(pos.azimuth, 90, 270, 180, 0));
 }
 
 void printTime(time_t t)
@@ -687,11 +667,7 @@ void printTimeLCD(time_t t)
 	//  lcd.print(":");
 	//  lcd.print(someTime.Second);
 	lcd.print(" UTC");
-	lcd.setCursor(17, 0);
 
-	lcd.write(0);
-	lcd.write(1);
-	lcd.write(2);
 
 	lcd.setCursor(0, 2);
 	//lcd.print("Mode: ");
@@ -709,6 +685,120 @@ void printTimeLCD(time_t t)
 	lcd.print(" V: ");
 	lcd.print(valV);
 
+
+}
+
+
+
+void printVoltageLCD() {
+
+	busvoltage1 = ina3221.getBusVoltage_V(1);			// 1 CH
+	shuntvoltage1 = ina3221.getShuntVoltage_mV(1);
+	current_mA1 = ina3221.getCurrent_mA(1);  
+	loadvoltage1 = busvoltage1 + (shuntvoltage1 / 1000);
+
+	lcd.setCursor(0, 3);
+	lcd.print(" V: ");
+	lcd.print(busvoltage1);
+	lcd.print("  mA: ");
+	lcd.print(current_mA1);
+}
+
+void printBatteryStatusLCD() {
+
+
+	if (busvoltage1 < 3)
+	{
+		lcd.createChar(1, Batery_stat[4]); //<40%
+		lcd.createChar(2, Batery_stat[10]); //<80%
+
+		if (busvoltage1 >= 2.8) {
+			lcd.createChar(0, Batery_stat[3]);  //>30%
+		}
+		else if (busvoltage1 >= 2.7) {
+			lcd.createChar(0, Batery_stat[2]);  //>20%
+		}
+		else if (busvoltage1 >= 2.6) {
+			lcd.createChar(0, Batery_stat[1]);  //>10%
+		}
+		else if (busvoltage1 >= 2.5) {
+			lcd.createChar(0, Batery_stat[0]);  //>0%
+		}
+
+	}
+	else if (busvoltage1 < 4) {
+		lcd.createChar(0, Batery_stat[3]);  //>30%
+		lcd.createChar(2, Batery_stat[10]); //80%
+
+		if (busvoltage1 >= 3.8)
+		{
+			lcd.createChar(1, Batery_stat[9]); //>=80%
+		}
+		else if(busvoltage1 >= 3.7)
+		{
+			lcd.createChar(1, Batery_stat[8]); //>=70%
+		}
+		else if(busvoltage1 >= 3.6)
+		{
+			lcd.createChar(1, Batery_stat[7]); //>=60%
+		}
+		else if(busvoltage1 >= 3.4)
+		{
+			lcd.createChar(1, Batery_stat[6]); //>=50%
+		}
+		else if(busvoltage1 >= 3.2)
+		{
+			lcd.createChar(1, Batery_stat[5]); //>=40%
+		}
+
+	}
+	else
+	{
+		lcd.createChar(0, Batery_stat[3]);  //>30%
+		lcd.createChar(1, Batery_stat[9]); //>=80%
+		if (busvoltage1 >= 4.1)
+
+		{
+			lcd.createChar(2, Batery_stat[12]); //100%
+		}
+		else {
+			lcd.createChar(2, Batery_stat[12]); //90%
+		}
+	}
+
+
+
+
+
+
+	if (busvoltage1 >= 4.1) {
+		lcd.createChar(0, Batery_stat[3]);  //Full charge bat
+		lcd.createChar(1, Batery_stat[9]);
+		lcd.createChar(2, Batery_stat[12]);
+	}
+	else if (busvoltage1 >= 4)
+	{
+		lcd.createChar(0, Batery_stat[3]);  //>30%
+		lcd.createChar(1, Batery_stat[9]);	//>80%
+		lcd.createChar(2, Batery_stat[11]); // 90%
+
+	}
+	else if (busvoltage1 >= 3.8) {
+		lcd.createChar(0, Batery_stat[3]);  //>30%
+		lcd.createChar(1, Batery_stat[9]);	// 80%
+		lcd.createChar(2, Batery_stat[10]); // <90%
+	}
+	else if (busvoltage1 >= 3.6) {
+		lcd.createChar(0, Batery_stat[3]);  //>30%
+		lcd.createChar(1, Batery_stat[8]);	// 70%
+		lcd.createChar(2, Batery_stat[10]); // <90%
+	}
+
+
+	lcd.setCursor(17, 0);
+	lcd.write(0);
+	lcd.write(1);
+	lcd.write(2);
 
 }
 
