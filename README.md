@@ -15,3 +15,9 @@ Created with editor Visual Studio 2019 and plug-in vMicro for Arduino
 
 ## LCD Main screen
 ![Main Screen](https://github.com/swefd/SolarTracker_Arduino/blob/master/img/LCD.jpg?raw=true)
+
+## Effectivity
+
+![Horizontal axis](https://github.com/swefd/SolarTracker_Arduino/blob/master/img/horizontalAxisGraph.png?raw=true)
+
+![Horizontal axis](https://github.com/swefd/SolarTracker_Arduino/blob/master/img/vertivalAxisGraph.png?raw=true)
